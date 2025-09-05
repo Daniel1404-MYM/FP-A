@@ -96,7 +96,7 @@ if uploaded_file:
                 {"role": "system", "content": "You are an expert FP&A analyst providing insights on financial forecasts."},
                 {"role": "user", "content": f"The financial forecast is summarized below:\n{forecast_summary}\nPlease provide insights, identify trends, and give strategic recommendations."}
             ],
-            model="llama3-8b-8192",
+            model="llama-3.1-8b-instant",
         )
 
         ai_commentary = response.choices[0].message.content
