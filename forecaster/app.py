@@ -22,10 +22,10 @@ st.set_page_config(page_title="Scenario Planning AI", page_icon="📊", layout="
 st.title("📊 Scenario Planning AI – Simulate Financial Scenarios")
 st.write("Upload financial data and enter a scenario prompt to simulate different projections!")
 
-# Model selector
+# Select AI Model
 selected_model = st.selectbox(
     "🤖 Select AI Model",
-    ["llama-3.1-8b-instant", "llama-3.1-70b-versatile", "mixtral-8x7b-32768"],
+    ["llama-3.1-8b-instant", "llama-3.3-70b-versatile", "openai/gpt-oss-20b"],
     index=0
 )
 
@@ -44,84 +44,83 @@ if uploaded_file:
 
     # Scenario Input
     scenario_prompt = st.text_area(
-        "📝 Enter a financial scenario (e.g., 'Revenue drops 10%', 'Costs increase by 5%'):"
+        "📝 Enter a financial scenario (e.g., 'Revenue drops 10%', 'Costs increase by 5%'):",
+        key="scenario_input"
     )
 
-    if st.button("🚀 Generate Scenarios"):
+    if st.button("🚀 Generate Scenarios", key="generate_button") and scenario_prompt:
         # Generate Different Scenario Projections
         df["Optimistic"] = df["Base Forecast"] * np.random.uniform(1.1, 1.3, len(df))
         df["Pessimistic"] = df["Base Forecast"] * np.random.uniform(0.7, 0.9, len(df))
         df["Worst Case"] = df["Base Forecast"] * np.random.uniform(0.5, 0.7, len(df))
 
-        # Layout: 2 columns
-        col1, col2 = st.columns([2, 1])
+        # Display scenario data
+        st.subheader("📊 Scenario-Based Projections")
+        st.dataframe(df)
 
-        with col1:
-            # Display scenario data
-            st.subheader("📊 Scenario-Based Projections")
-            st.dataframe(df)
+        # Plot Scenario Analysis
+        fig_scenarios = px.bar(
+            df,
+            x="Category",
+            y=["Base Forecast", "Optimistic", "Pessimistic", "Worst Case"],
+            title="📉 Scenario Planning: Financial Projections",
+            barmode="group",
+            text_auto=".2s",
+        )
+        st.plotly_chart(fig_scenarios)
 
-            # Plot Scenario Analysis
-            fig_scenarios = px.bar(
-                df,
-                x="Category",
-                y=["Base Forecast", "Optimistic", "Pessimistic", "Worst Case"],
-                title="📉 Scenario Planning: Financial Projections",
-                barmode="group",
-                text_auto=".2s",
+        # AI Section
+        st.subheader("🤖 AI Insights & Discussion")
+
+        try:
+            response = client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": "You are an AI financial analyst providing scenario planning insights."},
+                    {"role": "user", "content": f"Here are the scenario projections:\n{df.to_string()}\nScenario: {scenario_prompt}\nWhat are the key insights and recommendations?"}
+                ],
+                model=selected_model,
             )
-            st.plotly_chart(fig_scenarios, use_container_width=True)
+            st.markdown("**AI Analysis:**")
+            st.write(response.choices[0].message.content)
 
-        with col2:
-            # AI Section
-            st.subheader("🤖 AI Insights & Discussion")
+        except Exception as e:
+            st.error(f"⚠️ AI request failed: {e}")
 
-            # AI Summary of Scenario Data (limit rows to avoid token overload)
-            df_preview = df.head(20).to_string(index=False)
+        # --- AI Chat Section ---
+        st.subheader("💬 Interactive Discussion with AI")
 
+        if "chat_history" not in st.session_state:
+            st.session_state.chat_history = []
+
+        # Show previous conversation
+        for msg in st.session_state.chat_history:
+            if msg["role"] == "user":
+                st.markdown(f"**🧑 You:** {msg['content']}")
+            else:
+                st.markdown(f"**🤖 AI:** {msg['content']}")
+
+        # Chat input
+        user_query = st.text_input("💬 Ask AI something:", key="chat_input")
+
+        if st.button("Send", key="send_button") and user_query:
             try:
-                response = client.chat.completions.create(
+                chat_response = client.chat.completions.create(
                     messages=[
-                        {"role": "system", "content": "You are an AI financial analyst providing scenario planning insights."},
-                        {"role": "user", "content": f"Here are the scenario projections:\n{df_preview}\nScenario: {scenario_prompt}\nPlease summarize the key insights and recommendations."}
+                        {"role": "system", "content": "You are an AI financial strategist helping users with scenario-based financial modeling."},
+                        *st.session_state.chat_history,
+                        {"role": "user", "content": user_query}
                     ],
                     model=selected_model,
                 )
-                st.markdown("**AI Analysis:**")
-                st.write(response.choices[0].message.content)
+
+                ai_answer = chat_response.choices[0].message.content
+
+                # Save to session state
+                st.session_state.chat_history.append({"role": "user", "content": user_query})
+                st.session_state.chat_history.append({"role": "assistant", "content": ai_answer})
+
+                # Rerun so chat updates instantly
+                st.experimental_rerun()
 
             except Exception as e:
-                st.error(f"⚠️ AI request failed: {e}")
-
-            # Persistent chat messages
-            if "chat_history" not in st.session_state:
-                st.session_state.chat_history = []
-
-            user_query = st.text_input("💬 Ask AI something:")
-            if st.button("Send") and user_query:
-                try:
-                    chat_response = client.chat.completions.create(
-                        messages=[
-                            {"role": "system", "content": "You are an AI financial strategist helping users with scenario-based financial modeling."},
-                            *st.session_state.chat_history,
-                            {"role": "user", "content": user_query}
-                        ],
-                        model=selected_model,
-                    )
-
-                    ai_answer = chat_response.choices[0].message.content
-
-                    # Save to session state
-                    st.session_state.chat_history.append({"role": "user", "content": user_query})
-                    st.session_state.chat_history.append({"role": "assistant", "content": ai_answer})
-
-                except Exception as e:
-                    st.error(f"⚠️ AI chat request failed: {e}")
-
-            # Show chat history
-            if st.session_state.chat_history:
-                for msg in st.session_state.chat_history:
-                    if msg["role"] == "user":
-                        st.markdown(f"**👤 You:** {msg['content']}")
-                    else:
-                        st.markdown(f"**🤖 AI:** {msg['content']}")
+                st.error(f"⚠️ AI chat request failed: {e}")
