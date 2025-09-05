@@ -1,106 +1,123 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-from prophet import Prophet
+import duckdb
+import plotly.express as px
 import os
-from groq import Groq
 from dotenv import load_dotenv
 
-# Load API key securely
+#######################################
+# PAGE SETUP
+#######################################
+st.set_page_config(
+    page_title="📊 AI-Powered Dashboard Pro",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+st.title("📊 AI-Powered Dashboard Maker")
+st.caption("Prototype v2.0 - Rule-based & AI Commentary")
+
+#######################################
+# LOAD API (Optional Groq)
+#######################################
 load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-if not GROQ_API_KEY:
-    st.error("🚨 API Key is missing! Set it in Streamlit Secrets or a .env file.")
-    st.stop()
+if GROQ_API_KEY:
+    from groq import Groq
+    client = Groq(api_key=GROQ_API_KEY)
+else:
+    client = None
 
-# Streamlit App UI
-st.title("🔮 Financial Forecaster - AI-Powered Predictions")
-st.write("Upload an Excel file, select a column for forecasting, and get AI-generated financial insights!")
+#######################################
+# AI Commentary Function
+#######################################
+def generate_ai_commentary(region_sales: pd.DataFrame) -> str:
+    """Generate commentary with Groq LLM"""
+    if not client:
+        return "⚠️ AI Commentary tidak aktif (API Key belum diatur)."
 
-# File uploader
-uploaded_file = st.file_uploader("📂 Upload your financial data (Excel format)", type=["xlsx"])
+    text_summary = region_sales.to_string(index=False)
+    prompt = f"""
+    Berikut adalah data penjualan per region:
+    {text_summary}
+
+    Buat analisis singkat dalam bahasa Indonesia:
+    - Region mana yang dominan
+    - Region mana yang perlu perhatian
+    - Insight strategis singkat
+    """
+
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.1-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7
+        )
+        return response.choices[0].message["content"]
+    except Exception as e:
+        return f"❌ Error AI Commentary: {e}"
+
+#######################################
+# DATA UPLOAD
+#######################################
+uploaded_file = st.file_uploader("📂 Upload Excel file", type=["xlsx", "xls", "csv"])
 
 if uploaded_file:
-    # Read the uploaded Excel file
-    df = pd.read_excel(uploaded_file)
+    if uploaded_file.name.endswith(".csv"):
+        df = pd.read_csv(uploaded_file)
+    else:
+        df = pd.read_excel(uploaded_file)
 
-    # Display data preview
-    st.subheader("📊 Data Preview")
+    st.subheader("📜 Data Preview")
     st.dataframe(df.head())
 
-    # Select column for forecasting
-    target_column = st.selectbox("📌 Select the column to forecast:", df.columns)
-    
-    # Select categorical column for filtering (if applicable)
-    categorical_columns = df.select_dtypes(include=['object']).columns
-    if len(categorical_columns) > 0:
-        selected_category_column = st.selectbox("🎯 Select a categorical column to filter (Optional):", [None] + list(categorical_columns))
-        if selected_category_column:
-            unique_values = df[selected_category_column].unique()
-            selected_value = st.selectbox(f"🔍 Select value from {selected_category_column}:", unique_values)
-            df = df[df[selected_category_column] == selected_value]
+    #######################################
+    # DASHBOARD
+    #######################################
+    st.subheader("📈 Dashboard Overview")
 
-    # User input for forecast length
-    forecast_length = st.slider("⏳ Select the forecast length (days):", min_value=30, max_value=365, value=180)
-
-    if st.button("🚀 Generate Forecast"):
-        # Prepare data for Prophet
-        forecast_data = df.copy()
-        forecast_data = forecast_data.rename(columns={target_column: "y"})
-        forecast_data['ds'] = pd.date_range(start='2022-01-01', periods=len(df), freq='D')
-
-        # Train Prophet Model
-        model = Prophet(yearly_seasonality=True)
-        model.fit(forecast_data)
-
-        # Create future dates for prediction
-        future = model.make_future_dataframe(periods=forecast_length)
-        forecast = model.predict(future)
-
-        # Display Forecast Data
-        st.subheader("🔍 Forecasted Data Preview")
-        st.dataframe(forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail())
-
-        # Allow user to download forecast results
-        forecast_file_path = "financial_forecast_results.xlsx"
-        forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].to_excel(forecast_file_path, index=False)
-        st.download_button(label="📥 Download Forecast Data", data=open(forecast_file_path, "rb"), file_name="forecast_results.xlsx")
-
-        # Plot Forecast
-        st.subheader("📈 Forecast Visualization")
-        fig1 = model.plot(forecast)
-        st.pyplot(fig1)
-
-        # Forecast Components
-        st.subheader("📊 Forecast Components")
-        fig2 = model.plot_components(forecast)
-        st.pyplot(fig2)
-
-        # Prepare summary for AI
-        forecast_summary = f"""
-        Financial Forecast Summary:
-        - Forecasted Period: {forecast['ds'].iloc[-forecast_length].strftime('%Y-%m-%d')} to {forecast['ds'].iloc[-1].strftime('%Y-%m-%d')}
-        - Expected Range:
-          - Lower Bound: ${forecast['yhat_lower'].iloc[-forecast_length:].min():,.2f}
-          - Upper Bound: ${forecast['yhat_upper'].iloc[-forecast_length:].max():,.2f}
-        - Average Forecasted Value: ${forecast['yhat'].iloc[-forecast_length:].mean():,.2f}
+    if "Region" in df.columns and "Sales" in df.columns:
+        query = """
+        SELECT Region, SUM(Sales) as Total_Sales
+        FROM df
+        GROUP BY Region
+        ORDER BY Total_Sales DESC
         """
+        region_sales = duckdb.sql(query).df()
 
-        # AI Commentary Section
-        st.subheader("🤖 AI-Generated Strategic Insights")
+        # Bar chart
+        fig = px.bar(region_sales, x="Region", y="Total_Sales",
+                     title="Sales by Region", text_auto=True)
+        st.plotly_chart(fig, use_container_width=True)
 
-        client = Groq(api_key=GROQ_API_KEY)
-        response = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": "You are an expert FP&A analyst providing insights on financial forecasts."},
-                {"role": "user", "content": f"The financial forecast is summarized below:\n{forecast_summary}\nPlease provide insights, identify trends, and give strategic recommendations."}
-            ],
-            model="llama-3.1-8b-instant",
-        )
+        #######################################
+        # RULE-BASED COMMENTARY
+        #######################################
+        st.subheader("📝 Auto Commentary (Rule-based)")
 
-        ai_commentary = response.choices[0].message.content
+        top_region = region_sales.iloc[0]["Region"]
+        top_value = region_sales.iloc[0]["Total_Sales"]
 
-        # Display AI Commentary
-        st.subheader("💡 AI-Powered Forecast Insights")
-        st.write(ai_commentary)
+        bottom_region = region_sales.iloc[-1]["Region"]
+        bottom_value = region_sales.iloc[-1]["Total_Sales"]
+
+        commentary = f"""
+        🔍 **Insights**:
+        - Region dengan penjualan tertinggi adalah **{top_region}** sebesar **{top_value:,.0f}**.
+        - Region dengan penjualan terendah adalah **{bottom_region}** sebesar **{bottom_value:,.0f}**.
+        - Gap antara region tertinggi dan terendah adalah **{(top_value - bottom_value):,.0f}**.
+        """
+        st.markdown(commentary)
+
+        #######################################
+        # AI COMMENTARY (Optional)
+        #######################################
+        st.subheader("🤖 AI Commentary")
+        ai_text = generate_ai_commentary(region_sales)
+        st.write(ai_text)
+
+    else:
+        st.warning("⚠️ Data harus memiliki kolom `Region` dan `Sales` untuk analisis.")
+else:
+    st.info("⬆️ Upload file Excel/CSV untuk memulai.")
