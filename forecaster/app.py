@@ -66,7 +66,7 @@ if uploaded_file:
                 {"role": "system", "content": "You are an AI financial analyst providing scenario planning insights based on different projections."},
                 {"role": "user", "content": f"Here are the scenario projections:\n{df.to_string()}\nScenario: {scenario_prompt}\nWhat are the key insights and recommendations?"}
             ],
-            model="llama3-8b-8192",
+            model="llama-3.1-8b-instant",
         )
 
         st.write(response.choices[0].message.content)
@@ -81,6 +81,6 @@ if uploaded_file:
                     {"role": "system", "content": "You are an AI financial strategist helping users understand scenario-based financial modeling."},
                     {"role": "user", "content": f"Scenario Data:\n{df.to_string()}\n{user_query}"}
                 ],
-                model="llama3-8b-8192",
+                model="llama-3.1-8b-instant",
             )
             st.write(chat_response.choices[0].message.content)
