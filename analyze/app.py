@@ -87,6 +87,6 @@ if uploaded_file:
                 {"role": "system", "content": "You are an AI financial analyst helping users understand their budget vs. actual variance analysis."},
                 {"role": "user", "content": f"Variance Data:\n{df.to_string()}\n{user_query}"}
             ],
-            model="llama3-8b-8192",
+            model="llama-3.1-8b-instant",
         )
         st.write(chat_response.choices[0].message.content)
