@@ -62,31 +62,66 @@ if uploaded_file:
     )
     st.plotly_chart(fig_line)
 
-    # AI Section
+    # ==============================
+    # 🤖 AI Section
+    # ==============================
     st.subheader("🤖 AI-Powered Variance Analysis")
+
+    # Ringkas data untuk dikirim ke AI
+    df_summary = df.describe().to_string()
+    df_sample = df.head(15).to_string()
+
+    base_prompt = f"""
+    Here is the budget vs. actual variance summary:
+
+    {df_summary}
+
+    Here is a sample of the data (first 15 rows):
+
+    {df_sample}
+
+    Please provide key insights, trends, and actionable recommendations.
+    """
 
     # AI Summary of Variance Data
     client = Groq(api_key=GROQ_API_KEY)
     response = client.chat.completions.create(
+        model="llama3-8b-8192",
         messages=[
             {"role": "system", "content": "You are an AI financial analyst providing variance analysis insights on budget vs. actuals."},
-            {"role": "user", "content": f"Here is the budget vs. actual variance summary:\n{df.to_string()}\nWhat are the key insights and recommendations?"}
+            {"role": "user", "content": base_prompt}
         ],
-        model="llama3-8b-8192",
+        temperature=0.7,
+        max_tokens=800
     )
 
     st.write(response.choices[0].message.content)
 
-    # AI Chat - Users Can Ask Questions
+    # ==============================
+    # 🗣️ AI Chat Section
+    # ==============================
     st.subheader("🗣️ Chat with AI About Variance Analysis")
 
     user_query = st.text_input("🔍 Ask the AI about your variance data:")
     if user_query:
+        chat_prompt = f"""
+        Variance Summary:
+
+        {df_summary}
+
+        Data Sample (first 15 rows):
+
+        {df_sample}
+
+        User question: {user_query}
+        """
         chat_response = client.chat.completions.create(
+            model="llama3-8b-8192",
             messages=[
                 {"role": "system", "content": "You are an AI financial analyst helping users understand their budget vs. actual variance analysis."},
-                {"role": "user", "content": f"Variance Data:\n{df.to_string()}\n{user_query}"}
+                {"role": "user", "content": chat_prompt}
             ],
-            model="llama3-8b-8192",
+            temperature=0.7,
+            max_tokens=800
         )
         st.write(chat_response.choices[0].message.content)
