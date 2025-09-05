@@ -19,6 +19,15 @@ st.set_page_config(page_title="Scenario Planning AI", page_icon="📊", layout="
 st.title("📊 Scenario Planning AI – Simulate Financial Scenarios")
 st.write("Upload financial data and enter a scenario prompt to simulate different projections!")
 
+# Sidebar - AI Model Settings
+st.sidebar.header("⚙️ AI Model Settings")
+selected_model = st.sidebar.selectbox(
+    "Choose AI Model:",
+    options=["llama-3.1-8b-instant", "llama-3.3-70b-versatile"],
+    index=0,
+    help="8B = faster, 70B = more detailed analysis"
+)
+
 # File uploader
 uploaded_file = st.file_uploader("📂 Upload your dataset (Excel format)", type=["xlsx"])
 
@@ -33,7 +42,9 @@ if uploaded_file:
         st.stop()
 
     # Scenario Input
-    scenario_prompt = st.text_area("📝 Enter a financial scenario (e.g., 'Revenue drops 10%', 'Costs increase by 5%'):")
+    scenario_prompt = st.text_area(
+        "📝 Enter a financial scenario (e.g., 'Revenue drops 10%', 'Costs increase by 5%'):"
+    )
 
     if st.button("🚀 Generate Scenarios"):
         # Generate Different Scenario Projections
@@ -54,33 +65,40 @@ if uploaded_file:
             barmode="group",
             text_auto=".2s",
         )
-        st.plotly_chart(fig_scenarios)
+        st.plotly_chart(fig_scenarios, use_container_width=True)
 
         # AI Section
         st.subheader("🤖 AI-Powered Scenario Analysis")
 
-        # AI Summary of Scenario Data
-        client = Groq(api_key=GROQ_API_KEY)
-        response = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": "You are an AI financial analyst providing scenario planning insights based on different projections."},
-                {"role": "user", "content": f"Here are the scenario projections:\n{df.to_string()}\nScenario: {scenario_prompt}\nWhat are the key insights and recommendations?"}
-            ],
-            model="llama-3.1-8b-instant",
-        )
+        # Prepare data for AI (truncate to avoid long prompts)
+        df_preview = df.head(15).to_string()
 
-        st.write(response.choices[0].message.content)
+        client = Groq(api_key=GROQ_API_KEY)
+        try:
+            response = client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": "You are an AI financial analyst providing scenario planning insights based on different projections."},
+                    {"role": "user", "content": f"Here are the scenario projections:\n{df_preview}\nScenario: {scenario_prompt}\nWhat are the key insights and recommendations?"}
+                ],
+                model=selected_model,
+            )
+            st.write(response.choices[0].messages[0].content)
+        except Exception as e:
+            st.error(f"⚠️ AI request failed: {e}")
 
         # AI Chat - Users Can Ask Questions
         st.subheader("🗣️ Chat with AI About Scenario Planning")
 
         user_query = st.text_input("🔍 Ask the AI about financial scenarios:")
         if user_query:
-            chat_response = client.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": "You are an AI financial strategist helping users understand scenario-based financial modeling."},
-                    {"role": "user", "content": f"Scenario Data:\n{df.to_string()}\n{user_query}"}
-                ],
-                model="llama-3.1-8b-instant",
-            )
-            st.write(chat_response.choices[0].message.content)
+            try:
+                chat_response = client.chat.completions.create(
+                    messages=[
+                        {"role": "system", "content": "You are an AI financial strategist helping users understand scenario-based financial modeling."},
+                        {"role": "user", "content": f"Scenario Data:\n{df_preview}\n{user_query}"}
+                    ],
+                    model=selected_model,
+                )
+                st.write(chat_response.choices[0].messages[0].content)
+            except Exception as e:
+                st.error(f"⚠️ Chat request failed: {e}")
