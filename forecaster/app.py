@@ -14,18 +14,19 @@ if not GROQ_API_KEY:
     st.error("🚨 API Key is missing! Set it in Streamlit Secrets or a .env file.")
     st.stop()
 
+# Init Groq client
+client = Groq(api_key=GROQ_API_KEY)
+
 # Streamlit App UI
 st.set_page_config(page_title="Scenario Planning AI", page_icon="📊", layout="wide")
 st.title("📊 Scenario Planning AI – Simulate Financial Scenarios")
 st.write("Upload financial data and enter a scenario prompt to simulate different projections!")
 
-# Sidebar - AI Model Settings
-st.sidebar.header("⚙️ AI Model Settings")
-selected_model = st.sidebar.selectbox(
-    "Choose AI Model:",
-    options=["llama-3.1-8b-instant", "llama-3.3-70b-versatile"],
-    index=0,
-    help="8B = faster, 70B = more detailed analysis"
+# Model selector
+selected_model = st.selectbox(
+    "🤖 Select AI Model",
+    ["llama-3.1-8b-instant", "llama-3.1-70b-versatile", "mixtral-8x7b-32768"],
+    index=0
 )
 
 # File uploader
@@ -65,15 +66,14 @@ if uploaded_file:
             barmode="group",
             text_auto=".2s",
         )
-        st.plotly_chart(fig_scenarios, use_container_width=True)
+        st.plotly_chart(fig_scenarios)
 
         # AI Section
         st.subheader("🤖 AI-Powered Scenario Analysis")
 
-        # Prepare data for AI (truncate to avoid long prompts)
-        df_preview = df.head(15).to_string()
+        # AI Summary of Scenario Data (limit rows to avoid token overload)
+        df_preview = df.head(20).to_string(index=False)
 
-        client = Groq(api_key=GROQ_API_KEY)
         try:
             response = client.chat.completions.create(
                 messages=[
@@ -82,7 +82,9 @@ if uploaded_file:
                 ],
                 model=selected_model,
             )
-            st.write(response.choices[0].messages[0].content)
+
+            st.write(response.choices[0].message.content)
+
         except Exception as e:
             st.error(f"⚠️ AI request failed: {e}")
 
@@ -99,6 +101,7 @@ if uploaded_file:
                     ],
                     model=selected_model,
                 )
-                st.write(chat_response.choices[0].messages[0].content)
+                st.write(chat_response.choices[0].message.content)
+
             except Exception as e:
-                st.error(f"⚠️ Chat request failed: {e}")
+                st.error(f"⚠️ AI chat request failed: {e}")
