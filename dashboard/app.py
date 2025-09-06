@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 st.title("📊 AI-Powered Dashboard Maker")
-st.caption("Prototype v2.0 - Rule-based & AI Commentary")
+st.caption("Prototype v2.0 - Rule-based & AI Commentary + Chat Mode")
 
 #######################################
 # LOAD API (Optional Groq)
@@ -54,7 +54,6 @@ def generate_ai_commentary(region_sales: pd.DataFrame) -> str:
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7
         )
-        # ✅ perbaikan: gunakan .content, bukan ["content"]
         return response.choices[0].message.content
     except Exception as e:
         return f"❌ Error AI Commentary: {e}"
@@ -62,10 +61,9 @@ def generate_ai_commentary(region_sales: pd.DataFrame) -> str:
 #######################################
 # DATA UPLOAD
 #######################################
-uploaded_file = st.file_uploader("📂 Upload Excel/CSV file", type=["xlsx", "xls", "csv"])
+uploaded_file = st.file_uploader("📂 Upload Excel file", type=["xlsx", "xls", "csv"])
 
 if uploaded_file:
-    # Baca file
     if uploaded_file.name.endswith(".csv"):
         df = pd.read_csv(uploaded_file)
     else:
@@ -113,11 +111,46 @@ if uploaded_file:
         st.markdown(commentary)
 
         #######################################
-        # AI COMMENTARY (Optional)
+        # AI COMMENTARY (Initial)
         #######################################
         st.subheader("🤖 AI Commentary")
         ai_text = generate_ai_commentary(region_sales)
         st.write(ai_text)
+
+        #######################################
+        # AI CHAT MODE
+        #######################################
+        st.subheader("💬 Chat dengan AI Analis")
+
+        if "chat_history" not in st.session_state:
+            st.session_state.chat_history = [
+                {"role": "system", "content": "Anda adalah analis bisnis yang membantu memahami data penjualan."},
+                {"role": "assistant", "content": ai_text}  # mulai dengan hasil commentary
+            ]
+
+        # tampilkan riwayat chat
+        for msg in st.session_state.chat_history:
+            if msg["role"] == "user":
+                st.chat_message("user").write(msg["content"])
+            elif msg["role"] == "assistant":
+                st.chat_message("assistant").write(msg["content"])
+
+        # input pertanyaan baru
+        if question := st.chat_input("Tanyakan sesuatu..."):
+            st.session_state.chat_history.append({"role": "user", "content": question})
+            st.chat_message("user").write(question)
+
+            try:
+                response = client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=st.session_state.chat_history,
+                    temperature=0.7
+                )
+                answer = response.choices[0].message.content
+                st.session_state.chat_history.append({"role": "assistant", "content": answer})
+                st.chat_message("assistant").write(answer)
+            except Exception as e:
+                st.error(f"❌ Error chat: {e}")
 
     else:
         st.warning("⚠️ Data harus memiliki kolom `Region` dan `Sales` untuk analisis.")
