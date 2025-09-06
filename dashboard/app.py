@@ -54,16 +54,18 @@ def generate_ai_commentary(region_sales: pd.DataFrame) -> str:
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7
         )
-        return response.choices[0].message["content"]
+        # ✅ perbaikan: gunakan .content, bukan ["content"]
+        return response.choices[0].message.content
     except Exception as e:
         return f"❌ Error AI Commentary: {e}"
 
 #######################################
 # DATA UPLOAD
 #######################################
-uploaded_file = st.file_uploader("📂 Upload Excel file", type=["xlsx", "xls", "csv"])
+uploaded_file = st.file_uploader("📂 Upload Excel/CSV file", type=["xlsx", "xls", "csv"])
 
 if uploaded_file:
+    # Baca file
     if uploaded_file.name.endswith(".csv"):
         df = pd.read_csv(uploaded_file)
     else:
