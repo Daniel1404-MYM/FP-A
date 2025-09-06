@@ -25,7 +25,7 @@ st.write("Upload financial data and enter a scenario prompt to simulate differen
 # Model selector
 selected_model = st.selectbox(
     "🤖 Select AI Model",
-    ["llama-3.1-8b-instant", "llama-3.1-70b-versatile", "mixtral-8x7b-32768"],
+    ["llama-3.1-8b-instant", "llama-3.3-70b-versatile", "openai/gpt-oss-120b"],
     index=0
 )
 
