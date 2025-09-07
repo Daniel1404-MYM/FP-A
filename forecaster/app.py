@@ -18,8 +18,8 @@ if not GROQ_API_KEY:
 client = Groq(api_key=GROQ_API_KEY)
 
 # Streamlit App UI
-st.set_page_config(page_title="Scenario Planning AI", page_icon="📊", layout="wide")
-st.title("📊 Scenario Planning AI – Simulate Financial Scenarios")
+st.set_page_config(page_title="Financial Copilot AI", page_icon="📊", layout="wide")
+st.title("📊 Financial Copilot AI – Scenario Planning & Strategic Insights")
 st.write("Upload financial data and enter a scenario prompt to simulate different projections!")
 
 # Model selector
@@ -74,7 +74,7 @@ if uploaded_file:
 
         with col2:
             # AI Section
-            st.subheader("🤖 AI Insights & Discussion")
+            st.subheader("🤖 AI Financial Copilot Insights")
 
             # AI Summary of Scenario Data (limit rows to avoid token overload)
             df_preview = df.head(20).to_string(index=False)
@@ -82,12 +82,22 @@ if uploaded_file:
             try:
                 response = client.chat.completions.create(
                     messages=[
-                        {"role": "system", "content": "You are an AI financial analyst providing scenario planning insights."},
-                        {"role": "user", "content": f"Here are the scenario projections:\n{df_preview}\nScenario: {scenario_prompt}\nPlease summarize the key insights and recommendations."}
+                        {
+                            "role": "system",
+                            "content": """You are an AI Financial Copilot.
+                            You help analyze scenario planning, variance analysis, and strategy.
+                            You can discuss EBIT, revenue, margin, COGS, OPEX, CAPEX, cash flow,
+                            liquidity, financial distress, firm value, ESG, risk, and growth strategy.
+                            Always provide structured insights with both short-term and long-term recommendations."""
+                        },
+                        {
+                            "role": "user",
+                            "content": f"Here are the scenario projections:\n{df_preview}\nScenario: {scenario_prompt}\nPlease summarize the key insights and recommendations."
+                        }
                     ],
                     model=selected_model,
                 )
-                st.markdown("**AI Analysis:**")
+                st.markdown("**AI Initial Analysis:**")
                 st.write(response.choices[0].message.content)
 
             except Exception as e:
@@ -97,14 +107,31 @@ if uploaded_file:
             if "chat_history" not in st.session_state:
                 st.session_state.chat_history = []
 
-            user_query = st.text_input("💬 Ask AI something:")
-            if st.button("Send") and user_query:
+            user_query = st.text_input("💬 Ask your Financial Copilot anything (EBIT, Cash Flow, CAPEX, ESG, etc.)")
+
+            col_chat1, col_chat2 = st.columns([4,1])
+            with col_chat1:
+                send_btn = st.button("Send")
+            with col_chat2:
+                reset_btn = st.button("🔄 Reset Chat")
+
+            if reset_btn:
+                st.session_state.chat_history = []
+                st.success("Chat history cleared!")
+
+            if send_btn and user_query:
                 try:
                     chat_response = client.chat.completions.create(
                         messages=[
-                            {"role": "system", "content": "You are an AI financial strategist helping users with scenario-based financial modeling."},
+                            {
+                                "role": "system",
+                                "content": """You are an AI Financial Copilot.
+                                You can answer questions about EBIT, revenue, margin, OPEX, CAPEX, cash flow,
+                                firm value, ESG, risks, financial distress, and strategy.
+                                Always explain clearly and give actionable recommendations."""
+                            },
                             *st.session_state.chat_history,
-                            {"role": "user", "content": user_query}
+                            {"role": "user", "content": f"Dataset preview:\n{df_preview}\nScenario: {scenario_prompt}\n\nQuestion: {user_query}"}
                         ],
                         model=selected_model,
                     )
@@ -124,4 +151,4 @@ if uploaded_file:
                     if msg["role"] == "user":
                         st.markdown(f"**👤 You:** {msg['content']}")
                     else:
-                        st.markdown(f"**🤖 AI:** {msg['content']}")
+                        st.markdown(f"**🤖 Copilot:** {msg['content']}")
